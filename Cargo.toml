@@ -9,7 +9,7 @@ repository = "https://github.com/linasdev/stm32f1xx-hal-bxcan"
 documentation = "https://docs.rs/stm32f1xx-hal-bxcan"
 readme = "README.md"
 edition = "2018"
-version = "0.7.0"
+version = "0.8.0"
 
 [package.metadata.docs.rs]
 features = ["stm32f103", "rt", "stm32-usbd"]
