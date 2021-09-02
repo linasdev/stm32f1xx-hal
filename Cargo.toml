@@ -12,7 +12,7 @@ edition = "2018"
 version = "0.8.0"
 
 [package.metadata.docs.rs]
-features = ["stm32f103", "rt", "stm32-usbd"]
+features = ["stm32f103", "rt"]
 default-target = "x86_64-unknown-linux-gnu"
 
 [dependencies]
@@ -21,7 +21,7 @@ nb = "0.1.2"
 cortex-m-rt = "0.6.8"
 stm32f1 = "0.11.0"
 embedded-dma = "0.1.2"
-bxcan = "0.4.0"
+bxcan = ">=0.4, <0.6"
 
 [dependencies.void]
 default-features = false
@@ -36,8 +36,7 @@ version = "0.2.3"
 features = ["unproven"]
 
 [dependencies.stm32-usbd]
-version = "0.5.0"
-features = ["ram_access_1x16"]
+version = "0.6.0"
 optional = true
 
 [dev-dependencies]
@@ -79,7 +78,7 @@ doc = []
 rt = ["stm32f1/rt"]
 stm32f100 = ["stm32f1/stm32f100", "device-selected"]
 stm32f101 = ["stm32f1/stm32f101", "device-selected"]
-stm32f103 = ["stm32f1/stm32f103", "device-selected", "has-can"]
+stm32f103 = ["stm32f1/stm32f103", "device-selected", "has-can", "stm32-usbd"]
 stm32f105 = ["stm32f1/stm32f107", "device-selected", "connectivity"]
 stm32f107 = ["stm32f1/stm32f107", "device-selected", "connectivity"]
 
@@ -150,3 +149,7 @@ required-features = ["has-can", "rt"]
 [[example]]
 name = "gpio_input"
 required-features = ["stm32f103"]
+
+[[example]]
+name = "serial-interrupt-idle"
+required-features = ["stm32f103", "rt", "medium"]

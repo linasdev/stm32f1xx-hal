@@ -13,9 +13,8 @@ extern crate panic_semihosting;
 
 use cortex_m::asm::delay;
 use cortex_m_rt::entry;
-use embedded_hal::digital::v2::OutputPin;
 use stm32f1xx_hal::usb::{Peripheral, UsbBus};
-use stm32f1xx_hal::{prelude::*, stm32};
+use stm32f1xx_hal::{pac, prelude::*};
 use usb_device::prelude::*;
 use usbd_serial::{SerialPort, USB_CLASS_CDC};
 
@@ -24,7 +23,7 @@ fn main() -> ! {
     let dp = pac::Peripherals::take().unwrap();
 
     let mut flash = dp.FLASH.constrain();
-    let mut rcc = dp.RCC.constrain();
+    let rcc = dp.RCC.constrain();
 
     let clocks = rcc
         .cfgr
@@ -36,11 +35,11 @@ fn main() -> ! {
     assert!(clocks.usbclk_valid());
 
     // Configure the on-board LED (PC13, green)
-    let mut gpioc = dp.GPIOC.split(&mut rcc.apb2);
+    let mut gpioc = dp.GPIOC.split();
     let mut led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
     led.set_high(); // Turn off
 
-    let mut gpioa = dp.GPIOA.split(&mut rcc.apb2);
+    let mut gpioa = dp.GPIOA.split();
 
     // BluePill board has a pull-up resistor on the D+ line.
     // Pull the D+ pin down to send a RESET condition to the USB bus.

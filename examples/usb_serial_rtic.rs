@@ -7,7 +7,6 @@
 extern crate panic_semihosting;
 
 use cortex_m::asm::delay;
-use embedded_hal::digital::v2::OutputPin;
 use rtic::app;
 use stm32f1xx_hal::prelude::*;
 use stm32f1xx_hal::usb::{Peripheral, UsbBus, UsbBusType};
@@ -27,7 +26,7 @@ const APP: () = {
         static mut USB_BUS: Option<bus::UsbBusAllocator<UsbBusType>> = None;
 
         let mut flash = cx.device.FLASH.constrain();
-        let mut rcc = cx.device.RCC.constrain();
+        let rcc = cx.device.RCC.constrain();
 
         let clocks = rcc
             .cfgr
@@ -38,14 +37,14 @@ const APP: () = {
 
         assert!(clocks.usbclk_valid());
 
-        let mut gpioa = cx.device.GPIOA.split(&mut rcc.apb2);
+        let mut gpioa = cx.device.GPIOA.split();
 
         // BluePill board has a pull-up resistor on the D+ line.
         // Pull the D+ pin down to send a RESET condition to the USB bus.
         // This forced reset is needed only for development, without it host
         // will not reset your device when you upload new firmware.
         let mut usb_dp = gpioa.pa12.into_push_pull_output(&mut gpioa.crh);
-        usb_dp.set_low().unwrap();
+        usb_dp.set_low();
         delay(clocks.sysclk().0 / 100);
 
         let usb_dm = gpioa.pa11;

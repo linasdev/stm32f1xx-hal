@@ -2,7 +2,7 @@
   # Serial Peripheral Interface
   To construct the SPI instances, use the `Spi::spiX` functions.
 
-  The pin parameter is a tuple containing `(sck, miso, mosi)` which should be configured as `(Alternate<PushPull>, Input<Floating>, Alternate<PushPull>)`.
+  The pin parameter is a tuple containing `(sck, miso, mosi)` which should be configured as `(Alternate<...>, Input<...>, Alternate<...>)`.
   As some STM32F1xx chips have 5V tolerant SPI pins, it is also possible to configure Sck and Mosi outputs as `Alternate<PushPull>`. Then
   a simple Pull-Up to 5V can be used to use SPI on a 5V bus without a level shifter.
 
@@ -17,7 +17,7 @@
 
   ```rust
     // Acquire the GPIOB peripheral
-    let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
+    let mut gpiob = dp.GPIOB.split();
 
     let pins = (
         gpiob.pb13.into_alternate_push_pull(&mut gpiob.crh),
@@ -29,7 +29,7 @@
         polarity: Polarity::IdleLow,
         phase: Phase::CaptureOnFirstTransition,
     };
-    let spi = Spi::spi2(dp.SPI2, pins, spi_mode, 100.khz(), clocks, &mut rcc.apb1);
+    let spi = Spi::spi2(dp.SPI2, pins, spi_mode, 100.khz(), clocks);
   ```
 */
 
@@ -39,7 +39,7 @@ use core::ptr;
 pub use crate::hal::spi::{FullDuplex, Mode, Phase, Polarity};
 #[cfg(any(feature = "high", feature = "connectivity"))]
 use crate::pac::SPI3;
-use crate::pac::{SPI1, SPI2};
+use crate::pac::{RCC, SPI1, SPI2};
 
 use crate::afio::MAPR;
 use crate::dma::dma1;
@@ -50,8 +50,8 @@ use crate::gpio::gpioa::{PA5, PA6, PA7};
 use crate::gpio::gpiob::{PB13, PB14, PB15, PB3, PB4, PB5};
 #[cfg(feature = "connectivity")]
 use crate::gpio::gpioc::{PC10, PC11, PC12};
-use crate::gpio::{Alternate, Floating, Input, OpenDrain, PushPull};
-use crate::rcc::{Clocks, Enable, GetBusFreq, Reset, APB1, APB2};
+use crate::gpio::{Alternate, Input};
+use crate::rcc::{Clocks, Enable, GetBusFreq, Reset};
 use crate::time::Hertz;
 
 use core::sync::atomic::{self, Ordering};
@@ -127,11 +127,9 @@ macro_rules! remap {
             type Periph = $SPIX;
             const REMAP: bool = $state;
         }
-        impl Sck<$name> for $SCK<Alternate<PushPull>> {}
-        impl Sck<$name> for $SCK<Alternate<OpenDrain>> {}
-        impl Miso<$name> for $MISO<Input<Floating>> {}
-        impl Mosi<$name> for $MOSI<Alternate<PushPull>> {}
-        impl Mosi<$name> for $MOSI<Alternate<OpenDrain>> {}
+        impl<MODE> Sck<$name> for $SCK<Alternate<MODE>> {}
+        impl<MODE> Miso<$name> for $MISO<Input<MODE>> {}
+        impl<MODE> Mosi<$name> for $MOSI<Alternate<MODE>> {}
     };
 }
 
@@ -143,11 +141,21 @@ remap!(Spi3NoRemap, SPI3, false, PB3, PB4, PB5);
 #[cfg(feature = "connectivity")]
 remap!(Spi3Remap, SPI3, true, PC10, PC11, PC12);
 
+pub trait Instance:
+    crate::Sealed + Deref<Target = crate::pac::spi1::RegisterBlock> + Enable + Reset + GetBusFreq
+{
+}
+
+impl Instance for SPI1 {}
+impl Instance for SPI2 {}
+#[cfg(any(feature = "high", feature = "connectivity"))]
+impl Instance for SPI3 {}
+
 impl<REMAP, PINS> Spi<SPI1, REMAP, PINS, u8> {
     /**
       Constructs an SPI instance using SPI1 in 8bit dataframe mode.
 
-      The pin parameter tuple (sck, miso, mosi) should be `(PA5, PA6, PA7)` or `(PB3, PB4, PB5)` configured as `(Alternate<PushPull>, Input<Floating>, Alternate<PushPull>)`.
+      The pin parameter tuple (sck, miso, mosi) should be `(PA5, PA6, PA7)` or `(PB3, PB4, PB5)` configured as `(Alternate<...>, Input<...>, Alternate<...>)`.
 
       You can also use `NoSck`, `NoMiso` or `NoMosi` if you don't want to use the pins
     */
@@ -158,7 +166,6 @@ impl<REMAP, PINS> Spi<SPI1, REMAP, PINS, u8> {
         mode: Mode,
         freq: F,
         clocks: Clocks,
-        apb: &mut APB2,
     ) -> Self
     where
         F: Into<Hertz>,
@@ -166,7 +173,7 @@ impl<REMAP, PINS> Spi<SPI1, REMAP, PINS, u8> {
         PINS: Pins<REMAP>,
     {
         mapr.modify_mapr(|_, w| w.spi1_remap().bit(REMAP::REMAP));
-        Spi::<SPI1, _, _, u8>::_spi(spi, pins, mode, freq.into(), clocks, apb)
+        Spi::<SPI1, _, _, u8>::_spi(spi, pins, mode, freq.into(), clocks)
     }
 }
 
@@ -174,24 +181,17 @@ impl<REMAP, PINS> Spi<SPI2, REMAP, PINS, u8> {
     /**
       Constructs an SPI instance using SPI2 in 8bit dataframe mode.
 
-      The pin parameter tuple (sck, miso, mosi) should be `(PB13, PB14, PB15)` configured as `(Alternate<PushPull>, Input<Floating>, Alternate<PushPull>)`.
+      The pin parameter tuple (sck, miso, mosi) should be `(PB13, PB14, PB15)` configured as `(Alternate<...>, Input<...>, Alternate<...>)`.
 
       You can also use `NoSck`, `NoMiso` or `NoMosi` if you don't want to use the pins
     */
-    pub fn spi2<F>(
-        spi: SPI2,
-        pins: PINS,
-        mode: Mode,
-        freq: F,
-        clocks: Clocks,
-        apb: &mut APB1,
-    ) -> Self
+    pub fn spi2<F>(spi: SPI2, pins: PINS, mode: Mode, freq: F, clocks: Clocks) -> Self
     where
         F: Into<Hertz>,
         REMAP: Remap<Periph = SPI2>,
         PINS: Pins<REMAP>,
     {
-        Spi::<SPI2, _, _, u8>::_spi(spi, pins, mode, freq.into(), clocks, apb)
+        Spi::<SPI2, _, _, u8>::_spi(spi, pins, mode, freq.into(), clocks)
     }
 }
 
@@ -200,31 +200,24 @@ impl<REMAP, PINS> Spi<SPI3, REMAP, PINS, u8> {
     /**
       Constructs an SPI instance using SPI3 in 8bit dataframe mode.
 
-      The pin parameter tuple (sck, miso, mosi) should be `(PB3, PB4, PB5)` configured as `(Alternate<PushPull>, Input<Floating>, Alternate<PushPull>)`.
+      The pin parameter tuple (sck, miso, mosi) should be `(PB3, PB4, PB5)` configured as `(Alternate<...>, Input<...>, Alternate<...>)`.
 
       You can also use `NoSck`, `NoMiso` or `NoMosi` if you don't want to use the pins
     */
     #[cfg(not(feature = "connectivity"))]
-    pub fn spi3<F>(
-        spi: SPI3,
-        pins: PINS,
-        mode: Mode,
-        freq: F,
-        clocks: Clocks,
-        apb: &mut APB1,
-    ) -> Self
+    pub fn spi3<F>(spi: SPI3, pins: PINS, mode: Mode, freq: F, clocks: Clocks) -> Self
     where
         F: Into<Hertz>,
         REMAP: Remap<Periph = SPI3>,
         PINS: Pins<REMAP>,
     {
-        Spi::<SPI3, _, _, u8>::_spi(spi, pins, mode, freq.into(), clocks, apb)
+        Spi::<SPI3, _, _, u8>::_spi(spi, pins, mode, freq.into(), clocks)
     }
 
     /**
       Constructs an SPI instance using SPI3 in 8bit dataframe mode.
 
-      The pin parameter tuple (sck, miso, mosi) should be `(PB3, PB4, PB5)` or `(PC10, PC11, PC12)` configured as `(Alternate<PushPull>, Input<Floating>, Alternate<PushPull>)`.
+      The pin parameter tuple (sck, miso, mosi) should be `(PB3, PB4, PB5)` or `(PC10, PC11, PC12)` configured as `(Alternate<...>, Input<...>, Alternate<...>)`.
 
       You can also use `NoSck`, `NoMiso` or `NoMosi` if you don't want to use the pins
     */
@@ -236,7 +229,6 @@ impl<REMAP, PINS> Spi<SPI3, REMAP, PINS, u8> {
         mode: Mode,
         freq: F,
         clocks: Clocks,
-        apb: &mut APB1,
     ) -> Self
     where
         F: Into<Hertz>,
@@ -244,11 +236,9 @@ impl<REMAP, PINS> Spi<SPI3, REMAP, PINS, u8> {
         PINS: Pins<REMAP>,
     {
         mapr.modify_mapr(|_, w| w.spi3_remap().bit(REMAP::REMAP));
-        Spi::<SPI3, _, _, u8>::_spi(spi, pins, mode, freq.into(), clocks, apb)
+        Spi::<SPI3, _, _, u8>::_spi(spi, pins, mode, freq.into(), clocks)
     }
 }
-
-pub type SpiRegisterBlock = crate::pac::spi1::RegisterBlock;
 
 pub trait SpiReadWrite<T> {
     fn read_data_reg(&mut self) -> T;
@@ -258,7 +248,7 @@ pub trait SpiReadWrite<T> {
 
 impl<SPI, REMAP, PINS, FrameSize> SpiReadWrite<FrameSize> for Spi<SPI, REMAP, PINS, FrameSize>
 where
-    SPI: Deref<Target = SpiRegisterBlock>,
+    SPI: Instance,
     FrameSize: Copy,
 {
     fn read_data_reg(&mut self) -> FrameSize {
@@ -319,7 +309,7 @@ where
 
 impl<SPI, REMAP, PINS, FrameSize> Spi<SPI, REMAP, PINS, FrameSize>
 where
-    SPI: Deref<Target = SpiRegisterBlock>,
+    SPI: Instance,
     FrameSize: Copy,
 {
     #[deprecated(since = "0.6.0", note = "Please use release instead")]
@@ -341,25 +331,18 @@ where
 
 impl<SPI, REMAP, PINS> Spi<SPI, REMAP, PINS, u8>
 where
-    SPI: Deref<Target = SpiRegisterBlock> + Enable + Reset,
-    SPI::Bus: GetBusFreq,
+    SPI: Instance,
 {
-    fn _spi(
-        spi: SPI,
-        pins: PINS,
-        mode: Mode,
-        freq: Hertz,
-        clocks: Clocks,
-        apb: &mut SPI::Bus,
-    ) -> Self {
+    fn _spi(spi: SPI, pins: PINS, mode: Mode, freq: Hertz, clocks: Clocks) -> Self {
         // enable or reset SPI
-        SPI::enable(apb);
-        SPI::reset(apb);
+        let rcc = unsafe { &(*RCC::ptr()) };
+        SPI::enable(rcc);
+        SPI::reset(rcc);
 
         // disable SS output
         spi.cr2.write(|w| w.ssoe().clear_bit());
 
-        let br = match SPI::Bus::get_frequency(&clocks).0 / freq.0 {
+        let br = match SPI::get_frequency(&clocks).0 / freq.0 {
             0 => unreachable!(),
             1..=2 => 0b000,
             3..=5 => 0b001,
@@ -431,7 +414,7 @@ where
 
 impl<SPI, REMAP, PINS> Spi<SPI, REMAP, PINS, u16>
 where
-    SPI: Deref<Target = SpiRegisterBlock>,
+    SPI: Instance,
 {
     /// Converts from 16bit dataframe to 8bit.
     pub fn frame_size_8bit(self) -> Spi<SPI, REMAP, PINS, u8> {
@@ -450,7 +433,7 @@ where
 impl<SPI, REMAP, PINS, FrameSize> crate::hal::spi::FullDuplex<FrameSize>
     for Spi<SPI, REMAP, PINS, FrameSize>
 where
-    SPI: Deref<Target = SpiRegisterBlock>,
+    SPI: Instance,
     FrameSize: Copy,
 {
     type Error = Error;
@@ -495,14 +478,14 @@ where
 impl<SPI, REMAP, PINS, FrameSize> crate::hal::blocking::spi::transfer::Default<FrameSize>
     for Spi<SPI, REMAP, PINS, FrameSize>
 where
-    SPI: Deref<Target = SpiRegisterBlock>,
+    SPI: Instance,
     FrameSize: Copy,
 {
 }
 
 impl<SPI, REMAP, PINS> crate::hal::blocking::spi::Write<u8> for Spi<SPI, REMAP, PINS, u8>
 where
-    SPI: Deref<Target = SpiRegisterBlock>,
+    SPI: Instance,
 {
     type Error = Error;
 
@@ -517,7 +500,7 @@ where
 
 impl<SPI, REMAP, PINS> crate::hal::blocking::spi::Write<u16> for Spi<SPI, REMAP, PINS, u16>
 where
-    SPI: Deref<Target = SpiRegisterBlock>,
+    SPI: Instance,
 {
     type Error = Error;
 

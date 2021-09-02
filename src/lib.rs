@@ -62,7 +62,7 @@
 //! let clocks = rcc.cfgr.freeze(&mut flash.acr);
 //!
 //! // Prepare the alternate function I/O registers
-//! let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
+//! let mut afio = dp.AFIO.constrain();
 //! ```
 //!
 //! ## Usage examples
@@ -180,10 +180,14 @@ pub mod spi;
 pub mod time;
 #[cfg(feature = "device-selected")]
 pub mod timer;
-#[cfg(all(
-    feature = "stm32-usbd",
-    any(feature = "stm32f102", feature = "stm32f103")
-))]
+#[cfg(all(feature = "device-selected", feature = "stm32-usbd"))]
 pub mod usb;
 #[cfg(feature = "device-selected")]
 pub mod watchdog;
+
+#[cfg(feature = "device-selected")]
+mod sealed {
+    pub trait Sealed {}
+}
+#[cfg(feature = "device-selected")]
+use sealed::Sealed;

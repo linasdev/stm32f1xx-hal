@@ -15,7 +15,6 @@ use panic_halt as _;
 use stm32f1xx_hal::{pac, prelude::*, rtc::Rtc};
 
 use cortex_m_rt::entry;
-use embedded_hal::digital::v2::OutputPin;
 use nb::block;
 
 #[entry]
@@ -23,15 +22,15 @@ fn main() -> ! {
     let dp = pac::Peripherals::take().unwrap();
 
     let mut pwr = dp.PWR;
-    let mut rcc = dp.RCC.constrain();
+    let rcc = dp.RCC.constrain();
 
     // Set up the GPIO pin
-    let mut gpioc = dp.GPIOC.split(&mut rcc.apb2);
+    let mut gpioc = dp.GPIOC.split();
     let mut led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
 
     // Set up the RTC
     // Enable writes to the backup domain
-    let mut backup_domain = rcc.bkp.constrain(dp.BKP, &mut rcc.apb1, &mut pwr);
+    let mut backup_domain = rcc.bkp.constrain(dp.BKP, &mut pwr);
     // Start the RTC
     let mut rtc = Rtc::rtc(dp.RTC, &mut backup_domain);
 
@@ -43,10 +42,10 @@ fn main() -> ! {
         rtc.set_alarm(5);
         block!(rtc.wait_alarm()).unwrap();
         if led_on {
-            led.set_low().unwrap();
+            led.set_low();
             led_on = false;
         } else {
-            led.set_high().unwrap();
+            led.set_high();
             led_on = true;
         }
     }

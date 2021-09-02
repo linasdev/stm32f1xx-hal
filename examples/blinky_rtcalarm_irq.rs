@@ -24,7 +24,6 @@ use crate::hal::{
 use core::cell::RefCell;
 use cortex_m::{asm::wfi, interrupt::Mutex};
 use cortex_m_rt::entry;
-use embedded_hal::digital::v2::OutputPin;
 
 // A type definition for the GPIO pin to be used for our LED
 type LEDPIN = gpioc::PC13<Output<PushPull>>;
@@ -77,10 +76,10 @@ fn main() -> ! {
     let dp = Peripherals::take().unwrap();
 
     let mut pwr = dp.PWR;
-    let mut rcc = dp.RCC.constrain();
+    let rcc = dp.RCC.constrain();
 
     // Set up the GPIO pin
-    let mut gpioc = dp.GPIOC.split(&mut rcc.apb2);
+    let mut gpioc = dp.GPIOC.split();
     let mut led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
     let _ = led.set_high(); // Turn off
 
@@ -95,7 +94,7 @@ fn main() -> ! {
 
     // Set up the RTC
     // Enable writes to the backup domain
-    let mut backup_domain = rcc.bkp.constrain(dp.BKP, &mut rcc.apb1, &mut pwr);
+    let mut backup_domain = rcc.bkp.constrain(dp.BKP, &mut pwr);
     // Start the RTC
     let mut rtc = Rtc::rtc(dp.RTC, &mut backup_domain);
     rtc.set_time(0);

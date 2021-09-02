@@ -3,7 +3,7 @@
 //! ## Alternate function remapping
 //!
 //! TX: Alternate Push-Pull Output
-//! RX: Input Floating Input
+//! RX: Input
 //!
 //! ### CAN1
 //!
@@ -25,26 +25,21 @@ use crate::gpio::gpiob::{PB12, PB13, PB5, PB6};
 use crate::gpio::{
     gpioa::{PA11, PA12},
     gpiob::{PB8, PB9},
-    Alternate, Floating, Input, PushPull,
+    Alternate, Input,
 };
-use crate::pac::CAN1;
 #[cfg(feature = "connectivity")]
 use crate::pac::CAN2;
 #[cfg(not(feature = "connectivity"))]
 use crate::pac::USB;
-use crate::rcc::APB1;
+use crate::pac::{CAN1, RCC};
 
-mod sealed {
-    pub trait Sealed {}
-}
-
-pub trait Pins: sealed::Sealed {
+pub trait Pins: crate::Sealed {
     type Instance;
     fn remap(mapr: &mut MAPR);
 }
 
-impl sealed::Sealed for (PA12<Alternate<PushPull>>, PA11<Input<Floating>>) {}
-impl Pins for (PA12<Alternate<PushPull>>, PA11<Input<Floating>>) {
+impl<INMODE, OUTMODE> crate::Sealed for (PA12<Alternate<OUTMODE>>, PA11<Input<INMODE>>) {}
+impl<INMODE, OUTMODE> Pins for (PA12<Alternate<OUTMODE>>, PA11<Input<INMODE>>) {
     type Instance = CAN1;
 
     fn remap(mapr: &mut MAPR) {
@@ -55,8 +50,8 @@ impl Pins for (PA12<Alternate<PushPull>>, PA11<Input<Floating>>) {
     }
 }
 
-impl sealed::Sealed for (PB9<Alternate<PushPull>>, PB8<Input<Floating>>) {}
-impl Pins for (PB9<Alternate<PushPull>>, PB8<Input<Floating>>) {
+impl<INMODE, OUTMODE> crate::Sealed for (PB9<Alternate<OUTMODE>>, PB8<Input<INMODE>>) {}
+impl<INMODE, OUTMODE> Pins for (PB9<Alternate<OUTMODE>>, PB8<Input<INMODE>>) {
     type Instance = CAN1;
 
     fn remap(mapr: &mut MAPR) {
@@ -68,9 +63,9 @@ impl Pins for (PB9<Alternate<PushPull>>, PB8<Input<Floating>>) {
 }
 
 #[cfg(feature = "connectivity")]
-impl sealed::Sealed for (PB13<Alternate<PushPull>>, PB12<Input<Floating>>) {}
+impl<INMODE, OUTMODE> crate::Sealed for (PB13<Alternate<OUTMODE>>, PB12<Input<INMODE>>) {}
 #[cfg(feature = "connectivity")]
-impl Pins for (PB13<Alternate<PushPull>>, PB12<Input<Floating>>) {
+impl<INMODE, OUTMODE> Pins for (PB13<Alternate<OUTMODE>>, PB12<Input<INMODE>>) {
     type Instance = CAN2;
 
     fn remap(mapr: &mut MAPR) {
@@ -79,9 +74,9 @@ impl Pins for (PB13<Alternate<PushPull>>, PB12<Input<Floating>>) {
 }
 
 #[cfg(feature = "connectivity")]
-impl sealed::Sealed for (PB6<Alternate<PushPull>>, PB5<Input<Floating>>) {}
+impl<INMODE, OUTMODE> crate::Sealed for (PB6<Alternate<OUTMODE>>, PB5<Input<INMODE>>) {}
 #[cfg(feature = "connectivity")]
-impl Pins for (PB6<Alternate<PushPull>>, PB5<Input<Floating>>) {
+impl<INMODE, OUTMODE> Pins for (PB6<Alternate<OUTMODE>>, PB5<Input<INMODE>>) {
     type Instance = CAN2;
 
     fn remap(mapr: &mut MAPR) {
@@ -96,22 +91,26 @@ pub struct Can<Instance> {
 
 impl<Instance> Can<Instance>
 where
-    Instance: crate::rcc::Enable<Bus = APB1>,
+    Instance: crate::rcc::Enable,
 {
     /// Creates a CAN interaface.
     ///
     /// CAN shares SRAM with the USB peripheral. Take ownership of USB to
     /// prevent accidental shared usage.
     #[cfg(not(feature = "connectivity"))]
-    pub fn new(can: Instance, apb: &mut APB1, _usb: USB) -> Can<Instance> {
-        Instance::enable(apb);
+    pub fn new(can: Instance, _usb: USB) -> Can<Instance> {
+        let rcc = unsafe { &(*RCC::ptr()) };
+        Instance::enable(rcc);
+
         Can { _peripheral: can }
     }
 
     /// Creates a CAN interaface.
     #[cfg(feature = "connectivity")]
-    pub fn new(can: Instance, apb: &mut APB1) -> Can<Instance> {
-        Instance::enable(apb);
+    pub fn new(can: Instance) -> Can<Instance> {
+        let rcc = unsafe { &(*RCC::ptr()) };
+        Instance::enable(rcc);
+
         Can { _peripheral: can }
     }
 

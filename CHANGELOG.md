@@ -8,28 +8,46 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ### Breaking changes
+
+- Bump `stm32-usbd` dependency (`0.6.0`)
+- Use bit-banding for Peripheral enable/reset.
+  Don't require APBs in initializers.
 - Rename `gpio::Edge::{RISING, FALLING, RISING_FALLING}` to `Rising`, `Falling`, `RisingFalling`, respectively
 
 ### Added
 
-- Support for OpenDrain pin configuration on SPI CLK and MOSI pins
+- `From<Bps>` for `serial::Config`
+- `From<Into<Hertz>>` for `i2c::Mode`
+- `exti_rtic` example
+- Support for OpenDrain pin configuration on CAN, SPI, UART, PWM output pins
 - LSB/MSB bit format selection for `SPI`
 - Support for CAN peripherals with the `bxcan` crate
 - Add DAC, UART4, UART5 clock in RCC for the f103 high density line
 - `start_raw` function and `arr`, `bsc` getters for more fine grained
-  control over the timer
+  control over the timer.
 - Added RxTxDma support support to the DMA infrastructure
 - Added DMA receive support for `SPI`
 - Added `release` functions to SPI DMA
+- Add GPIOF/GPIOG support for high/xl density lines
+- Allow using `Input<PullUp>` and `Input<PullDown>` for all alternate
+  function inputs.
 
 ### Fixed
+
+- USART2 remap
 - Fix > 2 byte i2c reads
 - Send stop after acknowledge errors on i2c
 - Fix i2c interactions after errors
 - Fix SPI3 alternate function remapping
 - Do not enable UART DMA flags unconditionally
+- Fix flash erase verification always failing
 
 ### Changed
+
+- Move Tx & Rx in Serial. `Read` and `Write` now implemented on `Rx` and `Tx`
+- USB driver is now enabled by default for all devices supporting it
+- Updated `bxcan` dependency
+- Change internal implementation of pins using const generics
 - Use `cortex-m-rtic` instead of `cortex-m-rtfm` in the examples
 - Renamed `serial`'s `RxDma`/`TxDma`'s `split` method into `release`
 - Renamed I2C's `free` method into `release`

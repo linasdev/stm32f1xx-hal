@@ -1,7 +1,7 @@
 //! # Alternate Function I/Os
-use crate::pac::{afio, AFIO};
+use crate::pac::{afio, AFIO, RCC};
 
-use crate::rcc::{Enable, Reset, APB2};
+use crate::rcc::{Enable, Reset};
 
 use crate::gpio::{
     gpioa::PA15,
@@ -10,13 +10,14 @@ use crate::gpio::{
 };
 
 pub trait AfioExt {
-    fn constrain(self, apb2: &mut APB2) -> Parts;
+    fn constrain(self) -> Parts;
 }
 
 impl AfioExt for AFIO {
-    fn constrain(self, apb2: &mut APB2) -> Parts {
-        AFIO::enable(apb2);
-        AFIO::reset(apb2);
+    fn constrain(self) -> Parts {
+        let rcc = unsafe { &(*RCC::ptr()) };
+        AFIO::enable(rcc);
+        AFIO::reset(rcc);
 
         Parts {
             evcr: EVCR { _0: () },
@@ -41,7 +42,7 @@ impl AfioExt for AFIO {
 /// ```rust
 /// let p = pac::Peripherals::take().unwrap();
 /// let mut rcc = p.RCC.constrain();
-/// let mut afio = p.AFIO.constrain(&mut rcc.apb2);
+/// let mut afio = p.AFIO.constrain();
 pub struct Parts {
     pub evcr: EVCR,
     pub mapr: MAPR,
@@ -69,7 +70,7 @@ impl EVCR {
 /// ```rust
 /// let dp = pac::Peripherals::take().unwrap();
 /// let mut rcc = dp.RCC.constrain();
-/// let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
+/// let mut afio = dp.AFIO.constrain();
 /// function_using_mapr(&mut afio.mapr);
 /// ```
 pub struct MAPR {

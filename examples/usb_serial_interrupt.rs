@@ -7,10 +7,9 @@ extern crate panic_semihosting;
 
 use cortex_m::asm::{delay, wfi};
 use cortex_m_rt::entry;
-use embedded_hal::digital::v2::OutputPin;
-use stm32f1xx_hal::pac::{interrupt, Interrupt};
+use stm32f1xx_hal::pac::{self, interrupt, Interrupt, NVIC};
+use stm32f1xx_hal::prelude::*;
 use stm32f1xx_hal::usb::{Peripheral, UsbBus, UsbBusType};
-use stm32f1xx_hal::{prelude::*, stm32};
 use usb_device::{bus::UsbBusAllocator, prelude::*};
 use usbd_serial::{SerialPort, USB_CLASS_CDC};
 
@@ -20,11 +19,10 @@ static mut USB_DEVICE: Option<UsbDevice<UsbBusType>> = None;
 
 #[entry]
 fn main() -> ! {
-    let p = cortex_m::Peripherals::take().unwrap();
     let dp = pac::Peripherals::take().unwrap();
 
     let mut flash = dp.FLASH.constrain();
-    let mut rcc = dp.RCC.constrain();
+    let rcc = dp.RCC.constrain();
 
     let clocks = rcc
         .cfgr
@@ -35,7 +33,7 @@ fn main() -> ! {
 
     assert!(clocks.usbclk_valid());
 
-    let mut gpioa = dp.GPIOA.split(&mut rcc.apb2);
+    let mut gpioa = dp.GPIOA.split();
 
     // BluePill board has a pull-up resistor on the D+ line.
     // Pull the D+ pin down to send a RESET condition to the USB bus.
@@ -72,10 +70,10 @@ fn main() -> ! {
         USB_DEVICE = Some(usb_dev);
     }
 
-    let mut nvic = p.NVIC;
-
-    nvic.enable(Interrupt::USB_HP_CAN_TX);
-    nvic.enable(Interrupt::USB_LP_CAN_RX0);
+    unsafe {
+        NVIC::unmask(Interrupt::USB_HP_CAN_TX);
+        NVIC::unmask(Interrupt::USB_LP_CAN_RX0);
+    }
 
     loop {
         wfi();

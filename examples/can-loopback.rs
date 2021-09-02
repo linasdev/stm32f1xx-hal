@@ -11,7 +11,6 @@ use bxcan::{
 use panic_halt as _;
 
 use cortex_m_rt::entry;
-use embedded_hal::digital::v2::OutputPin;
 use nb::block;
 use stm32f1xx_hal::{can::Can, pac, prelude::*};
 
@@ -20,17 +19,17 @@ fn main() -> ! {
     let dp = pac::Peripherals::take().unwrap();
 
     let mut flash = dp.FLASH.constrain();
-    let mut rcc = dp.RCC.constrain();
+    let rcc = dp.RCC.constrain();
 
     // To meet CAN clock accuracy requirements, an external crystal or ceramic
     // resonator must be used.
     rcc.cfgr.use_hse(8.mhz()).freeze(&mut flash.acr);
 
     #[cfg(not(feature = "connectivity"))]
-    let can = Can::new(dp.CAN1, &mut rcc.apb1, dp.USB);
+    let can = Can::new(dp.CAN1, dp.USB);
 
     #[cfg(feature = "connectivity")]
-    let can = Can::new(dp.CAN1, &mut rcc.apb1);
+    let can = Can::new(dp.CAN1);
 
     let mut can = bxcan::Can::new(can);
 
@@ -109,9 +108,9 @@ fn main() -> ! {
         assert!(can.receive().is_err());
     }
 
-    let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
+    let mut gpiob = dp.GPIOB.split();
     let mut led = gpiob.pb9.into_push_pull_output(&mut gpiob.crh);
-    led.set_high().unwrap();
+    led.set_high();
 
     loop {}
 }
